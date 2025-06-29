@@ -1,4 +1,3 @@
-```markdown
 # Downloads Screenshot Manager 📸
 
 Een eenvoudige webapplicatie om screenshots en afbeeldingen in je Downloads folder te beheren. Met thumbnail preview, bulk selectie en directe verwijdering.
@@ -226,4 +225,3 @@ Dit project is gelicenseerd onder de MIT License.
 ---
 
 **Let op**: Deze applicatie verwijdert bestanden permanent. Zorg ervoor dat je backups hebt van belangrijke bestanden voordat je ze verwijdert.
-```
