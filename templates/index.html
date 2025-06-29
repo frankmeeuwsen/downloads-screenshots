@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Downloads Screenshot Manager</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .stats {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .controls {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 0 5px;
+        }
+        
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        
+        .btn-danger {
+            background-color: #dc3545;
+        }
+        
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        
+        .image-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+        }
+        
+        .image-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        .image-card.focused {
+            outline: 3px solid #007bff;
+            outline-offset: 2px;
+        }
+        
+        .image-card.selected {
+            background-color: #e7f3ff;
+        }
+        
+        .image-container {
+            position: relative;
+            padding-bottom: 75%; /* 4:3 aspect ratio */
+            overflow: hidden;
+            background: #f0f0f0;
+        }
+        
+        .image-container img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            cursor: pointer;
+        }
+        
+        .image-info {
+            padding: 12px;
+        }
+        
+        .filename {
+            font-size: 14px;
+            color: #333;
+            font-weight: 500;
+            margin-bottom: 5px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .file-size {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .image-actions {
+            padding: 0 12px 12px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.9);
+        }
+        
+        .modal-content {
+            margin: auto;
+            display: block;
+            max-width: 90%;
+            max-height: 90%;
+            margin-top: 50px;
+        }
+        
+        .close {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: #bbb;
+        }
+        
+        .no-images {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+        
+        .checkbox-container {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            border-radius: 4px;
+            padding: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .refresh-btn {
+            background-color: #28a745;
+        }
+        
+        .refresh-btn:hover {
+            background-color: #218838;
+        }
+        
+        .keyboard-hint {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px auto;
+            max-width: 800px;
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .keyboard-hint h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .keyboard-hint kbd {
+            background-color: #eee;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-family: monospace;
+            font-size: 12px;
+            box-shadow: 0 1px 0 rgba(0,0,0,0.2);
+        }
+        
+        .hint-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📸 Downloads Screenshot Manager</h1>
+        <p class="stats">
+            <span id="imageCount">0</span> afbeeldingen gevonden
+        </p>
+    </div>
+    
+    <div class="controls">
+        <button class="btn refresh-btn" onclick="loadImages()">🔄 Vernieuwen</button>
+        <button class="btn btn-danger" id="deleteSelectedBtn" onclick="deleteSelected()" style="display:none;">
+            🗑️ Verwijder geselecteerde (<span id="selectedCount">0</span>)
+        </button>
+    </div>
+    
+    <div class="keyboard-hint">
+        <h3>⌨️ Keyboard shortcuts:</h3>
+        <div class="hint-grid">
+            <div><kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> Navigeer</div>
+            <div><kbd>Spatie</kbd> Selecteer/deselecteer</div>
+            <div><kbd>Enter</kbd> Open afbeelding</div>
+            <div><kbd>Delete</kbd> Verwijder huidige</div>
+            <div><kbd>A</kbd> Selecteer alles</div>
+            <div><kbd>D</kbd> Deselecteer alles</div>
+            <div><kbd>Shift + Delete</kbd> Verwijder geselecteerde</div>
+            <div><kbd>Esc</kbd> Sluit preview</div>
+        </div>
+    </div>
+    
+    <div id="loading" class="loading">Afbeeldingen laden...</div>
+    <div id="gallery" class="gallery" style="display:none;"></div>
+    <div id="noImages" class="no-images" style="display:none;">
+        <p>Geen afbeeldingen gevonden in ~/Downloads</p>
+    </div>
+    
+    <!-- Modal voor grote afbeelding -->
+    <div id="imageModal" class="modal">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <img class="modal-content" id="modalImage">
+    </div>
+    
+    <script>
+        let images = [];
+        let selectedImages = new Set();
+        let currentFocusIndex = -1;
+        let isModalOpen = false;
+        
+        // Laad afbeeldingen bij het laden van de pagina
+        window.onload = () => {
+            loadImages();
+        };
+        
+        function loadImages() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('gallery').style.display = 'none';
+            document.getElementById('noImages').style.display = 'none';
+            selectedImages.clear();
+            currentFocusIndex = -1;
+            updateSelectedCount();
+            
+            fetch('/api/images')
+                .then(response => response.json())
+                .then(data => {
+                    images = data;
+                    displayImages();
+                })
+                .catch(error => {
+                    console.error('Error loading images:', error);
+                    alert('Fout bij het laden van afbeeldingen');
+                });
+        }
+        
+        function displayImages() {
+            const gallery = document.getElementById('gallery');
+            const loading = document.getElementById('loading');
+            const noImages = document.getElementById('noImages');
+            const imageCount = document.getElementById('imageCount');
+            
+            loading.style.display = 'none';
+            
+            if (images.length === 0) {
+                noImages.style.display = 'block';
+                gallery.style.display = 'none';
+                imageCount.textContent = '0';
+                return;
+            }
+            
+            imageCount.textContent = images.length;
+            gallery.innerHTML = '';
+            gallery.style.display = 'grid';
+            
+            images.forEach((image, index) => {
+                const card = createImageCard(image, index);
+                gallery.appendChild(card);
+            });
+            
+            // Focus eerste item als er nog geen focus is
+            if (currentFocusIndex === -1 && images.length > 0) {
+                setFocus(0);
+            }
+        }
+        
+        function createImageCard(image, index) {
+            const card = document.createElement('div');
+            card.className = 'image-card';
+            card.id = `card-${index}`;
+            card.dataset.index = index;
+            
+            const fileSize = formatFileSize(image.size);
+            const isSelected = selectedImages.has(image.name);
+            
+            if (isSelected) {
+                card.classList.add('selected');
+            }
+            
+            card.innerHTML = `
+                <div class="image-container">
+                    <img src="/api/thumbnail/${encodeURIComponent(image.name)}" 
+                         alt="${image.name}"
+                         loading="lazy"
+                         onclick="showModal('${encodeURIComponent(image.name)}')">
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="check-${index}" 
+                               ${isSelected ? 'checked' : ''}
+                               onchange="toggleSelection(${index}, '${image.name}')">
+                    </div>
+                </div>
+                <div class="image-info">
+                    <div class="filename" title="${image.name}">${image.name}</div>
+                    <div class="file-size">${fileSize}</div>
+                </div>
+                <div class="image-actions">
+                    <button class="btn btn-danger" onclick="deleteImage('${image.name}', ${index})">
+                        🗑️ Verwijder
+                    </button>
+                </div>
+            `;
+            
+            // Voeg click event toe voor focus
+            card.addEventListener('click', (e) => {
+                if (!e.target.matches('button, input, img')) {
+                    setFocus(index);
+                }
+            });
+            
+            return card;
+        }
+        
+        function setFocus(index) {
+            // Verwijder oude focus
+            if (currentFocusIndex >= 0) {
+                const oldCard = document.getElementById(`card-${currentFocusIndex}`);
+                if (oldCard) oldCard.classList.remove('focused');
+            }
+            
+            // Set nieuwe focus
+            currentFocusIndex = index;
+            const newCard = document.getElementById(`card-${index}`);
+            if (newCard) {
+                newCard.classList.add('focused');
+                newCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+        
+        function getGridDimensions() {
+            const gallery = document.getElementById('gallery');
+            const cards = gallery.querySelectorAll('.image-card');
+            if (cards.length === 0) return { cols: 0, rows: 0 };
+            
+            const galleryRect = gallery.getBoundingClientRect();
+            const firstCardRect = cards[0].getBoundingClientRect();
+            const cardWidth = firstCardRect.width;
+            
+            const cols = Math.floor(galleryRect.width / cardWidth);
+            const rows = Math.ceil(cards.length / cols);
+            
+            return { cols, rows };
+        }
+        
+        function navigateGrid(direction) {
+            if (images.length === 0) return;
+            
+            const { cols } = getGridDimensions();
+            let newIndex = currentFocusIndex;
+            
+            switch(direction) {
+                case 'ArrowLeft':
+                    newIndex = Math.max(0, currentFocusIndex - 1);
+                    break;
+                case 'ArrowRight':
+                    newIndex = Math.min(images.length - 1, currentFocusIndex + 1);
+                    break;
+                case 'ArrowUp':
+                    newIndex = Math.max(0, currentFocusIndex - cols);
+                    break;
+                case 'ArrowDown':
+                    newIndex = Math.min(images.length - 1, currentFocusIndex + cols);
+                    break;
+            }
+            
+            if (newIndex !== currentFocusIndex) {
+                setFocus(newIndex);
+            }
+        }
+        
+        function toggleCurrentSelection() {
+            if (currentFocusIndex >= 0 && currentFocusIndex < images.length) {
+                const image = images[currentFocusIndex];
+                const checkbox = document.getElementById(`check-${currentFocusIndex}`);
+                checkbox.checked = !checkbox.checked;
+                toggleSelection(currentFocusIndex, image.name);
+            }
+        }
+        
+        function selectAll() {
+            images.forEach((image, index) => {
+                selectedImages.add(image.name);
+                const checkbox = document.getElementById(`check-${index}`);
+                const card = document.getElementById(`card-${index}`);
+                if (checkbox) checkbox.checked = true;
+                if (card) card.classList.add('selected');
+            });
+            updateSelectedCount();
+        }
+        
+        function deselectAll() {
+            selectedImages.clear();
+            images.forEach((image, index) => {
+                const checkbox = document.getElementById(`check-${index}`);
+                const card = document.getElementById(`card-${index}`);
+                if (checkbox) checkbox.checked = false;
+                if (card) card.classList.remove('selected');
+            });
+            updateSelectedCount();
+        }
+        
+        function toggleSelection(index, filename) {
+            const checkbox = document.getElementById(`check-${index}`);
+            const card = document.getElementById(`card-${index}`);
+            
+            if (checkbox.checked) {
+                selectedImages.add(filename);
+                card.classList.add('selected');
+            } else {
+                selectedImages.delete(filename);
+                card.classList.remove('selected');
+            }
+            
+            updateSelectedCount();
+        }
+        
+        function updateSelectedCount() {
+            const count = selectedImages.size;
+            document.getElementById('selectedCount').textContent = count;
+            document.getElementById('deleteSelectedBtn').style.display = 
+                count > 0 ? 'inline-block' : 'none';
+        }
+        
+        function deleteSelected() {
+            if (selectedImages.size === 0) return;
+            
+            if (!confirm(`Weet je zeker dat je ${selectedImages.size} afbeelding(en) wilt verwijderen?`)) {
+                return;
+            }
+            
+            const promises = Array.from(selectedImages).map(filename => 
+                fetch(`/api/delete/${encodeURIComponent(filename)}`, { method: 'DELETE' })
+            );
+            
+            Promise.all(promises)
+                .then(() => {
+                    alert(`${selectedImages.size} afbeelding(en) verwijderd`);
+                    loadImages();
+                })
+                .catch(error => {
+                    console.error('Error deleting images:', error);
+                    alert('Fout bij het verwijderen van sommige afbeeldingen');
+                    loadImages();
+                });
+        }
+        
+        function deleteImage(filename, index) {
+            if (!confirm(`Weet je zeker dat je "${filename}" wilt verwijderen?`)) {
+                return;
+            }
+            
+            fetch(`/api/delete/${encodeURIComponent(filename)}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Verwijder uit array en update display
+                    images.splice(index, 1);
+                    displayImages();
+                } else {
+                    alert('Fout bij verwijderen: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Fout bij verwijderen van bestand');
+            });
+        }
+        
+        function deleteFocused() {
+            if (currentFocusIndex >= 0 && currentFocusIndex < images.length) {
+                const image = images[currentFocusIndex];
+                deleteImage(image.name, currentFocusIndex);
+            }
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
+            return Math.round(bytes / (1024 * 1024) * 10) / 10 + ' MB';
+        }
+        
+        function showModal(filename) {
+            const modal = document.getElementById('imageModal');
+            const modalImage = document.getElementById('modalImage');
+            modalImage.src = `/api/thumbnail/${filename}`;
+            modal.style.display = 'block';
+            isModalOpen = true;
+        }
+        
+        function showCurrentInModal() {
+            if (currentFocusIndex >= 0 && currentFocusIndex < images.length) {
+                const image = images[currentFocusIndex];
+                showModal(encodeURIComponent(image.name));
+            }
+        }
+        
+        function closeModal() {
+            document.getElementById('imageModal').style.display = 'none';
+            isModalOpen = false;
+        }
+        
+        // Sluit modal bij klik buiten afbeelding
+        window.onclick = function(event) {
+            const modal = document.getElementById('imageModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+        
+        // Keyboard event handler
+        document.addEventListener('keydown', (e) => {
+            // Voorkom default browser gedrag voor sommige keys
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+                e.preventDefault();
+            }
+            
+            // Modal controls
+            if (isModalOpen) {
+                if (e.key === 'Escape') {
+                    closeModal();
+                }
+                return;
+            }
+            
+            // Gallery navigation
+            switch(e.key) {
+                case 'ArrowLeft':
+                case 'ArrowRight':
+                case 'ArrowUp':
+                case 'ArrowDown':
+                    navigateGrid(e.key);
+                    break;
+                    
+                case ' ': // Spatiebalk
+                    toggleCurrentSelection();
+                    break;
+                    
+                case 'Enter':
+                    showCurrentInModal();
+                    break;
+                    
+                case 'Delete':
+                    if (e.shiftKey && selectedImages.size > 0) {
+                        deleteSelected();
+                    } else {
+                        deleteFocused();
+                    }
+                    break;
+                    
+                case 'a':
+                case 'A':
+                    if (e.ctrlKey || e.metaKey) {
+                        e.preventDefault();
+                    }
+                    selectAll();
+                    break;
+                    
+                case 'd':
+                case 'D':
+                    deselectAll();
+                    break;
+                    
+                case 'F5':
+                    e.preventDefault();
+                    loadImages();
+                    break;
+                    
+                case 'r':
+                case 'R':
+                    if (e.ctrlKey || e.metaKey) {
+                        e.preventDefault();
+                        loadImages();
+                    }
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>
